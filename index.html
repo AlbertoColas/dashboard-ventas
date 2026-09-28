@@ -45,6 +45,7 @@
   .title { font-size: 16px; font-weight: 600; margin: 0; }
   .sub { font-size: 13px; color: var(--muted); margin: 2px 0 6px; }
   .num { font-size: 44px; font-weight: 600; line-height: 1.05; letter-spacing: -.02em; font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .num.long { font-size: 32px; }
   .num small { font-size: .55em; font-weight: 600; margin-left: 1px; }
   .num .of { font-size: .5em; color: var(--muted); font-weight: 500; margin-left: 4px; }
   .foot { font-size: 12.5px; color: var(--muted); margin-top: 6px; }
@@ -82,10 +83,12 @@ function pctCard(title, sub, num, den, foot, target) {
     <div class="num ${cls}">${txt}${v === null ? "" : "<small>%</small>"}</div><div class="foot">${esc(foot)}</div></div>`;
 }
 
+function miles(n) { return (n === null || n === undefined || isNaN(n)) ? n : Number(n).toLocaleString("de-DE"); }
+
 function goalCard(title, actual, goal, ritmo, goalMax, nota) {
   if (!goal) {
     return `<div class="card"><p class="title">${esc(title)}</p><p class="sub">Sin objetivo definido</p>
-      <div class="num neutral">${actual}</div><div class="foot">Escríbelo en la página del mes (CRM MENSUAL)</div></div>`;
+      <div class="num neutral">${miles(actual)}</div><div class="foot">Escríbelo en la página del mes (CRM MENSUAL)</div></div>`;
   }
   const expected = ritmo.total ? goal * ritmo.elapsed / ritmo.total : 0;
   // Semáforo por ritmo: lo que llevamos frente a lo que deberíamos llevar a estas alturas
@@ -101,12 +104,12 @@ function goalCard(title, actual, goal, ritmo, goalMax, nota) {
     const r = actual / expected;
     cls = r >= 1 ? "green" : r > 0.7 ? "amber" : "red";
     const diff = Math.round(actual - expected);
-    foot = `A estas alturas: ${Math.round(expected)} · ` + (diff >= 0 ? `vas +${diff}` : `faltan ${-diff}`) + " · " + pctTxt;
+    foot = `A estas alturas: ${miles(Math.round(expected))} · ` + (diff >= 0 ? `vas +${miles(diff)}` : `faltan ${miles(-diff)}`) + " · " + pctTxt;
   }
   const fillW = Math.min(100, actual / goal * 100);
   const markL = Math.min(100, expected / goal * 100);
-  return `<div class="card"><p class="title">${esc(title)}</p><p class="sub">Objetivo: ${goal}${goalMax ? "–" + goalMax : ""}${nota ? " · " + nota : ""}</p>
-    <div class="num ${cls}">${actual}<span class="of">/ ${goal}</span></div>
+  return `<div class="card"><p class="title">${esc(title)}</p><p class="sub">Objetivo: ${miles(goal)}${goalMax ? "–" + miles(goalMax) : ""}${nota ? " · " + nota : ""}</p>
+    <div class="num ${cls}${(String(actual) + String(goal)).length > 6 ? " long" : ""}">${miles(actual)}<span class="of">/ ${miles(goal)}</span></div>
     <div class="bar ${cls}"><div class="fill" style="width:${fillW}%"></div>${ritmo.elapsed ? `<div class="mark" style="left:calc(${markL}% - 1px)" title="Ritmo esperado"></div>` : ""}</div>
     <div class="foot">${esc(foot)}</div></div>`;
 }
