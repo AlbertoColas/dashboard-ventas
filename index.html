@@ -77,7 +77,7 @@ const esc = s => String(s).replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;",
 function pctCard(title, sub, num, den, foot, target) {
   const v = fmtPct(num, den);
   const txt = v === null ? "—" : v.toFixed(2).replace(".", ",");
-  const cls = (v === null || !target) ? "neutral" : v >= target ? "green" : v >= target * 0.85 ? "amber" : "red";
+  const cls = (v === null || !target) ? "neutral" : v >= target ? "green" : v > target * 0.7 ? "amber" : "red";
   return `<div class="card"><p class="title">${esc(title)}</p><p class="sub">${esc(sub)}${target ? " · objetivo " + target + "%" : ""}</p>
     <div class="num ${cls}">${txt}${v === null ? "" : "<small>%</small>"}</div><div class="foot">${esc(foot)}</div></div>`;
 }
@@ -88,14 +88,16 @@ function goalCard(title, actual, goal, ritmo, goalMax, nota) {
       <div class="num neutral">${actual}</div><div class="foot">Escríbelo en la página del mes (CRM MENSUAL)</div></div>`;
   }
   const expected = ritmo.total ? goal * ritmo.elapsed / ritmo.total : 0;
-  let cls, foot;
-  if (actual >= goal) { cls = "green"; foot = "¡Objetivo conseguido!"; }
-  else if (ritmo.elapsed === 0) { cls = "neutral"; foot = ritmo.startLabel || "Arrancando el mes"; }
+  // Semáforo: % conseguido del objetivo → ≤70% rojo · entre 70% y 100% ámbar · ≥100% verde
+  const logro = actual / goal;
+  const cls = logro >= 1 ? "green" : logro > 0.7 ? "amber" : "red";
+  const pctTxt = Math.round(logro * 100) + "% del objetivo";
+  let foot;
+  if (actual >= goal) foot = "¡Objetivo conseguido! · " + pctTxt;
+  else if (ritmo.elapsed === 0) foot = pctTxt + " · " + (ritmo.startLabel || "Arrancando el mes");
   else {
-    const ratio = actual / expected;
-    cls = ratio >= 1 ? "green" : ratio >= 0.85 ? "amber" : "red";
     const diff = Math.round(actual - expected);
-    foot = `A estas alturas: ${Math.round(expected)} · ` + (diff >= 0 ? `vas +${diff}` : `faltan ${-diff}`);
+    foot = pctTxt + ` · a estas alturas: ${Math.round(expected)} (` + (diff >= 0 ? `vas +${diff}` : `faltan ${-diff}`) + ")";
   }
   const fillW = Math.min(100, actual / goal * 100);
   const markL = Math.min(100, expected / goal * 100);
