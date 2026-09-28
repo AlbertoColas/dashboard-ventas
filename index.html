@@ -88,16 +88,20 @@ function goalCard(title, actual, goal, ritmo, goalMax, nota) {
       <div class="num neutral">${actual}</div><div class="foot">Escríbelo en la página del mes (CRM MENSUAL)</div></div>`;
   }
   const expected = ritmo.total ? goal * ritmo.elapsed / ritmo.total : 0;
-  // Semáforo: % conseguido del objetivo → ≤70% rojo · entre 70% y 100% ámbar · ≥100% verde
+  // Semáforo por ritmo: lo que llevamos frente a lo que deberíamos llevar a estas alturas
+  // ≤70% del ritmo rojo · entre 70% y 100% ámbar · ≥100% (o objetivo conseguido) verde
   const logro = actual / goal;
-  const cls = logro >= 1 ? "green" : logro > 0.7 ? "amber" : "red";
   const pctTxt = Math.round(logro * 100) + "% del objetivo";
-  let foot;
-  if (actual >= goal) foot = "¡Objetivo conseguido! · " + pctTxt;
-  else if (ritmo.elapsed === 0) foot = pctTxt + " · " + (ritmo.startLabel || "Arrancando el mes");
-  else {
+  let cls, foot;
+  if (actual >= goal) { cls = "green"; foot = "¡Objetivo conseguido! · " + pctTxt; }
+  else if (ritmo.elapsed === 0 || expected <= 0) {
+    cls = actual > 0 ? "green" : "neutral";
+    foot = pctTxt + " · " + (ritmo.startLabel || "Arrancando el mes");
+  } else {
+    const r = actual / expected;
+    cls = r >= 1 ? "green" : r > 0.7 ? "amber" : "red";
     const diff = Math.round(actual - expected);
-    foot = pctTxt + ` · a estas alturas: ${Math.round(expected)} (` + (diff >= 0 ? `vas +${diff}` : `faltan ${-diff}`) + ")";
+    foot = `A estas alturas: ${Math.round(expected)} · ` + (diff >= 0 ? `vas +${diff}` : `faltan ${-diff}`) + " · " + pctTxt;
   }
   const fillW = Math.min(100, actual / goal * 100);
   const markL = Math.min(100, expected / goal * 100);
