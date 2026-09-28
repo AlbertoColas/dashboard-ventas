@@ -82,6 +82,215 @@ function pctCard(title, sub, num, den, foot, target) {
     <div class="num ${cls}">${txt}${v === null ? "" : "<small>%</small>"}</div><div class="foot">${esc(foot)}</div></div>`;
 }
 
+function goalCard(title, actual, goal, ritmo, goalMax, nota) {
+  if (!goal) {
+    return `<div class="card"><p class="title">${esc(title)}</p><p class="sub">Sin objetivo definido</p>
+      <div class="num neutral">${actual}</div><div class="foot">Escríbelo en la página del mes (CRM MENSUAL)</div></div>`;
+  }
+  const expected = ritmo.total ? goal * ritmo.elapsed / ritmo.total : 0;
+  let cls, foot;
+  if (actual >= goal) { cls = "green"; foot = "¡Objetivo conseguido!"; }
+  else if (ritmo.elapsed === 0) { cls = "neutral"; foot = ritmo.startLabel || "Arrancando el mes"; }
+  else {
+    const ratio = actual / expected;
+    cls = ratio >= 1 ? "green" : ratio >= 0.85 ? "amber" : "red";
+    const diff = Math.round(actual - expected);
+    foot = `A estas alturas: ${Math.round(expected)} · ` + (diff >= 0 ? `vas +${diff}` : `faltan ${-diff}`);
+  }
+  const fillW = Math.min(100, actual / goal * 100);
+  const markL = Math.min(100, expected / goal * 100);
+  return `<div class="card"><p class="title">${esc(title)}</p><p class="sub">Objetivo: ${goal}${goalMax ? "–" + goalMax : ""}${nota ? " · " + nota : ""}</p>
+    <div class="num ${cls}">${actual}<span class="of">/ ${goal}</span></div>
+    <div class="bar ${cls}"><div class="fill" style="width:${fillW}%"></div>${ritmo.elapsed ? `<div class="mark" style="left:calc(${markL}% - 1px)" title="Ritmo esperado"></div>` : ""}</div>
+    <div class="foot">${esc(foot)}</div></div>`;
+}
+
+function salesCard(title, s) {
+  const pct = s.ventas ? Math.round(s.unico / s.ventas * 100) : 0;
+  const extra = s.sinRegistrar ? ` · ${s.sinRegistrar} sin pago registrado` : "";
+  return `<div class="card"><p class="title">${esc(title)}</p><p class="sub">Ventas cerradas</p>
+    <div class="num neutral">${s.ventas}</div>
+    <div class="foot">${s.unico} a pago único (${pct}%)${esc(extra)}</div></div>`;
+}
+
+function fmtRange(a, b) {
+  const M = ["ene","feb","mar","abr","may","jun","jul","ago","sep","oct","nov","dic"];
+  const f = s => Number(s.slice(8, 10)) + " " + M[Number(s.slice(5, 7)) - 1];
+  return f(a) + " – " + f(b);
+}
+
+function numCard(title, sub, value, foot) {
+  return '<div class="card"><p class="title">' + esc(title) + '</p><p class="sub">' + esc(sub) + '</p><div class="num neutral">' + value + '</div><div class="foot">' + esc(foot) + '</div></div>';
+}
+
+function render(data) {
+  const p = data.periods;
+  const mIdx = Number(data.today.slice(5, 7)) - 1;
+  const mName = MONTHS[mIdx];
+  document.getElementById("monthTitle").textContent = `Objetivo de ${mName}`;
+  document.getElementById("demo").style.display = data.demo ? "inline" : "none";
+  const t = new Date(data.updatedAt);
+  document.getElementById("stamp").textContent = "Actualizado " +
+    t.toLocaleTimeString("es-ES", { hour: "2-digit", minute: "2-digit", timeZone: "Europe/Madrid" });
+
+  const obj = data.objetivo || {};
+  document.getElementById("gridMonth").innerHTML =
+    goalCard("Entrevistas agendadas", p.month.agendadasTotal != null ? p.month.agendadasTotal : p.month.agendadas, obj.agendadas, data.ritmo) +
+    goalCard("Llamadas realizadas", p.month.asistidas, obj.realizadasMin, data.ritmo, obj.realizadasMax) +
+    goalCard("Cierres", p.month.ventas, obj.cierresMin, data.ritmo, obj.cierresMax) +
+    salesCard(`Ventas ${mName}`, p.month) +
+    salesCard(`Ventas ${data.today.slice(0, 4)}`, p.year);
+
+  const w = data.semana, ow = data.objetivoSemana;
+  if (w) {
+    document.getElementById("weekTitle").textContent = "Objetivo de la semana · " + fmtRange(w.desde, w.hasta);
+    document.getElementById("gridWeek").innerHTML = ow ?
+      goalCard("Llamadas agendadas", w.agendadasTotal, ow.agendadas, data.ritmoSemana) +
+      goalCard("Llamadas realizadas", w.asistidas, ow.realizadasMin, data.ritmoSemana, ow.realizadasMax) +
+      goalCard("Cierres", w.ventas, ow.cierresMin, data.ritmoSemana, ow.cierresMax)
+      : '<div class="card"><p class="title">Sin objetivo semanal</p><p class="sub">Escríbelo en la reunión del equipo de ventas</p></div>';
+  }
+
+  document.getElementById("gridRatios").innerHTML =
+    pctCard("Asistencia", "Últimos 30 días", p.d30.asistidas, p.d30.agendadas, `${p.d30.asistidas} de ${p.d30.agendadas} agendadas`, obj.showup) +
+    pctCard("Asistencia", "Este año", p.year.asistidas, p.year.agendadas, `${p.year.asistidas} de ${p.year.agendadas} agendadas`, obj.showup) +
+    pctCard("Cierre", "Últimos 30 días", p.d30.ventas, p.d30.asistidas, `${p.d30.ventas} ventas de ${p.d30.asistidas} llamadas`, obj.cierrePctMin) +
+    pctCard("Cierre", `Este trimestre (T${data.quarter})`, p.quarter.ventas, p.quarter.asistidas, `${p.quarter.ventas} ventas de ${p.quarter.asistidas} llamadas`, obj.cierrePctMin) +
+    pctCard("Cierre", "Este año", p.year.ventas, p.year.asistidas, `${p.year.ventas} ventas de ${p.year.asistidas} llamadas`, obj.cierrePctMin);
+  const tq = "Este trimestre (T" + data.quarter + ")";
+  document.getElementById("closers").innerHTML = (data.closers || []).map(function (c) {
+    const q = c.periods;
+    return '<div class="top"><span class="section">Métricas de ' + esc(c.nombre) + '</span></div><div class="grid">' +
+      numCard("Llamadas realizadas", "Este mes", q.month.asistidas, q.month.agendadas + " agendadas") +
+      salesCard("Ventas " + mName, q.month) +
+      pctCard("Cierre", "Últimos 30 días", q.d30.ventas, q.d30.asistidas, q.d30.ventas + " ventas de " + q.d30.asistidas + " llamadas", obj.cierrePctMin) +
+      pctCard("Cierre", tq, q.quarter.ventas, q.quarter.asistidas, q.quarter.ventas + " ventas de " + q.quarter.asistidas + " llamadas", obj.cierrePctMin) +
+      pctCard("Cierre", "Este año", q.year.ventas, q.year.asistidas, q.year.ventas + " ventas de " + q.year.asistidas + " llamadas", obj.cierrePctMin) +
+      '</div>';
+  }).join("");
+  const esSetter = VISTA === "setter";
+  document.getElementById("ratiosBlock").style.display = esSetter ? "none" : "";
+  document.getElementById("closers").style.display = esSetter ? "none" : "";
+  const rango = w ? fmtRange(w.desde, w.hasta) : "Esta semana";
+  const fmt = n => (n === null || n === undefined) ? "—" : n;
+  document.getElementById("setters").innerHTML = !esSetter ? "" : (data.setters || []).map(function (s) {
+    const fila = (titulo, per, sub, semanal) => '<div class="top"><span class="section">' + titulo + '</span></div><div class="grid">' +
+      numCard("Bienvenidas", sub, fmt(per.bienvenidas), (semanal && per.bienvenidas === null) ? "Falta la fila de esta semana en CRM Mensual" : "Según tabla CRM Mensual") +
+      numCard("Propuestas de llamada", sub, fmt(per.propuestas), "Según tabla CRM Mensual") +
+      numCard("Llamadas agendadas", sub, per.agendadas, "Con " + s.nombre + " como setter") +
+      numCard("Cierres setteados", sub, per.cierres, "Ventas con " + s.nombre + " como setter") +
+      '</div>';
+    return fila("Métricas de " + esc(s.nombre) + " · esta semana", s.semana, rango, true) +
+           fila("Métricas de " + esc(s.nombre) + " · " + mName, s.mes, "Acumulado de " + mName, false);
+  }).join("");
+  if (esSetter && data.setters && data.setters[0]) {
+    const s0 = data.setters[0], bso = data.bienvenidasSemanaObjetivo;
+    if (w && data.objetivoSemana)
+      document.getElementById("gridWeek").innerHTML += goalCard("Bienvenidas", s0.semana.bienvenidas || 0, bso ? bso.valor : null, data.ritmoSemana, null, bso && bso.derivado ? "parte proporcional del mes" : "");
+    document.getElementById("gridMonth").innerHTML += goalCard("Bienvenidas", s0.mes.bienvenidas || 0, obj.bienvenidas, data.ritmo);
+  }
+}
+
+const API = "https://script.google.com/macros/s/AKfycbxWSdheRFPwOYmyp8M4936GVyqja6qCNxXYe6JKiPp2t9iHZnGIHvNUJgFL9s3IZ5RHXg/exec?format=json";
+let VISTA = new URLSearchParams(location.search).get("vista") || "";
+function onData(data) { const err = document.getElementById("err"); err.hidden = true; render(data); const avisos = []; if (data.pagosError) avisos.push("Pago único no disponible (" + data.pagosError + ")"); if (data.setterError && VISTA === "setter") avisos.push("Métricas de setter no disponibles (" + data.setterError + ")"); if (data.objetivoSemanaError) avisos.push("Objetivo semanal no disponible (" + data.objetivoSemanaError + ")"); if (data.objetivoError) avisos.push("Objetivos no disponibles (" + data.objetivoError + ")"); if (avisos.length) { err.textContent = avisos.join(" · "); err.hidden = false; } }
+function load() {
+  const err = document.getElementById("err");
+  fetch(API + "&t=" + Date.now(), { credentials: "omit", cache: "no-store" })
+    .then(r => r.json())
+    .then(data => { if (data.error) throw new Error(data.error); onData(data); })
+    .catch(e => { err.textContent = "No se pudieron cargar las métricas (" + (e && e.message || e) + "). Reintentando…"; err.hidden = false; });
+}
+load();
+setInterval(load, 5 * 60 * 1000);
+document.addEventListener("visibilitychange", () => { if (!document.hidden) load(); });
+</script>
+</body>
+</html>
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Métricas equipo de ventas</title>
+<style>
+  :root {
+    --bg: #ffffff;
+    --card: #ffffff;
+    --border: #e9e9eb;
+    --shadow: 0 1px 2px rgba(15, 15, 20, .04);
+    --text: #3a3d44;
+    --muted: #8b8f98;
+    --track: #eeeff1;
+    --red: #d64545;
+    --amber: #d38b0b;
+    --green: #1f9d55;
+    --neutral: #3a3d44;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #191919; --card: #232323; --border: #2f2f2f; --shadow: none;
+      --text: #e6e6e6; --muted: #9b9b9b; --track: #333;
+      --red: #ef6b6b; --amber: #f0b03d; --green: #4cc38a; --neutral: #e6e6e6;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #191919; --card: #232323; --border: #2f2f2f; --shadow: none;
+    --text: #e6e6e6; --muted: #9b9b9b; --track: #333;
+    --red: #ef6b6b; --amber: #f0b03d; --green: #4cc38a; --neutral: #e6e6e6;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; background: var(--bg); color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Inter, Helvetica, Arial, sans-serif;
+    -webkit-font-smoothing: antialiased; }
+  body { padding: 4px 2px 8px; }
+  .top { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; margin: 0 2px 10px; flex-wrap: wrap; }
+  .section { font-size: 12px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); }
+  .stamp { font-size: 12px; color: var(--muted); }
+  .demo { display: none; font-size: 12px; color: var(--amber); font-weight: 600; }
+  .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 12px; margin-bottom: 18px; }
+  .card { background: var(--card); border: 1px solid var(--border); border-radius: 14px; box-shadow: var(--shadow);
+    padding: 16px 18px 14px; min-width: 0; }
+  .title { font-size: 16px; font-weight: 600; margin: 0; }
+  .sub { font-size: 13px; color: var(--muted); margin: 2px 0 6px; }
+  .num { font-size: 44px; font-weight: 600; line-height: 1.05; letter-spacing: -.02em; font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .num small { font-size: .55em; font-weight: 600; margin-left: 1px; }
+  .num .of { font-size: .5em; color: var(--muted); font-weight: 500; margin-left: 4px; }
+  .foot { font-size: 12.5px; color: var(--muted); margin-top: 6px; }
+  .bar { position: relative; height: 6px; background: var(--track); border-radius: 99px; margin-top: 10px; overflow: visible; }
+  .bar .fill { position: absolute; inset: 0 auto 0 0; border-radius: 99px; background: currentColor; transition: width .6s ease; }
+  .bar .mark { position: absolute; top: -4px; width: 2px; height: 14px; background: var(--muted); border-radius: 1px; }
+  .red { color: var(--red); } .amber { color: var(--amber); } .green { color: var(--green); } .neutral { color: var(--neutral); }
+  .err { font-size: 13px; color: var(--red); padding: 8px 2px; }
+</style>
+</head>
+<body>
+  <div class="top">
+    <span class="section" id="weekTitle">Objetivo de la semana</span>
+    <span><span class="demo" id="demo">Datos de ejemplo · falta conectar Notion · </span><span class="stamp" id="stamp"></span></span>
+  </div>
+  <div class="grid" id="gridWeek"></div>
+  <div class="top"><span class="section" id="monthTitle">Objetivo del mes</span></div>
+  <div class="grid" id="gridMonth"></div>
+  <div id="ratiosBlock"><div class="top"><span class="section">Ratios</span></div>
+  <div class="grid" id="gridRatios"></div></div>
+  <div id="setters"></div>
+  <div id="closers"></div>
+  <div class="err" id="err" hidden></div>
+
+<script>
+const MONTHS = ["enero","febrero","marzo","abril","mayo","junio","julio","agosto","septiembre","octubre","noviembre","diciembre"];
+const fmtPct = (n, d) => d ? (n / d * 100) : null;
+const esc = s => String(s).replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+
+function pctCard(title, sub, num, den, foot, target) {
+  const v = fmtPct(num, den);
+  const txt = v === null ? "—" : v.toFixed(2).replace(".", ",");
+  const cls = (v === null || !target) ? "neutral" : v >= target ? "green" : v >= target * 0.85 ? "amber" : "red";
+  return `<div class="card"><p class="title">${esc(title)}</p><p class="sub">${esc(sub)}${target ? " · objetivo " + target + "%" : ""}</p>
+    <div class="num ${cls}">${txt}${v === null ? "" : "<small>%</small>"}</div><div class="foot">${esc(foot)}</div></div>`;
+}
+
 function goalCard(title, actual, goal, ritmo, goalMax) {
   if (!goal) {
     return `<div class="card"><p class="title">${esc(title)}</p><p class="sub">Sin objetivo este mes</p>
