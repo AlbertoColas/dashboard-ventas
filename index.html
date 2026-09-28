@@ -91,18 +91,23 @@ function goalCard(title, actual, goal, ritmo, goalMax, nota) {
       <div class="num neutral">${miles(actual)}</div><div class="foot">Escríbelo en la página del mes (CRM MENSUAL)</div></div>`;
   }
   const expected = ritmo.total ? goal * ritmo.elapsed / ritmo.total : 0;
-  // Semáforo por ritmo: lo que llevamos frente a lo que deberíamos llevar a estas alturas
-  // ≤70% del ritmo rojo · entre 70% y 100% ámbar · ≥100% (o objetivo conseguido) verde
+  // Semáforo
+  //  · SEMANA: % conseguido del objetivo semanal → ≤70% rojo · 70–99% ámbar · ≥100% verde
+  //  · MES: lo que llevamos frente a lo que deberíamos llevar a estas alturas (mismos cortes)
+  const semanal = !!ritmo.startLabel;
   const logro = actual / goal;
   const pctTxt = Math.round(logro * 100) + "% del objetivo";
+  const color = r => r >= 1 ? "green" : r > 0.7 ? "amber" : "red";
   let cls, foot;
   if (actual >= goal) { cls = "green"; foot = "¡Objetivo conseguido! · " + pctTxt; }
-  else if (ritmo.elapsed === 0 || expected <= 0) {
-    cls = actual > 0 ? "green" : "neutral";
-    foot = pctTxt + " · " + (ritmo.startLabel || "Arrancando el mes");
+  else if (semanal) {
+    cls = color(logro);
+    foot = pctTxt + " · faltan " + miles(goal - actual);
+  } else if (ritmo.elapsed === 0 || expected <= 0) {
+    cls = color(logro);
+    foot = pctTxt + " · Arrancando el mes";
   } else {
-    const r = actual / expected;
-    cls = r >= 1 ? "green" : r > 0.7 ? "amber" : "red";
+    cls = color(actual / expected);
     const diff = Math.round(actual - expected);
     foot = `A estas alturas: ${miles(Math.round(expected))} · ` + (diff >= 0 ? `vas +${miles(diff)}` : `faltan ${miles(-diff)}`) + " · " + pctTxt;
   }
@@ -110,7 +115,7 @@ function goalCard(title, actual, goal, ritmo, goalMax, nota) {
   const markL = Math.min(100, expected / goal * 100);
   return `<div class="card"><p class="title">${esc(title)}</p><p class="sub">Objetivo: ${miles(goal)}${goalMax ? "–" + miles(goalMax) : ""}${nota ? " · " + nota : ""}</p>
     <div class="num ${cls}${(String(actual) + String(goal)).length > 6 ? " long" : ""}">${miles(actual)}<span class="of">/ ${miles(goal)}</span></div>
-    <div class="bar ${cls}"><div class="fill" style="width:${fillW}%"></div>${ritmo.elapsed ? `<div class="mark" style="left:calc(${markL}% - 1px)" title="Ritmo esperado"></div>` : ""}</div>
+    <div class="bar ${cls}"><div class="fill" style="width:${fillW}%"></div>${(ritmo.elapsed && !semanal) ? `<div class="mark" style="left:calc(${markL}% - 1px)" title="Ritmo esperado"></div>` : ""}</div>
     <div class="foot">${esc(foot)}</div></div>`;
 }
 
