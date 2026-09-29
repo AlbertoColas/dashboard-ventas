@@ -75,11 +75,15 @@ const MONTHS = ["enero","febrero","marzo","abril","mayo","junio","julio","agosto
 const fmtPct = (n, d) => d ? (n / d * 100) : null;
 const esc = s => String(s).replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
 
-function pctCard(title, sub, num, den, foot, target) {
+function pctCard(title, sub, num, den, foot, target, bandas) {
   const v = fmtPct(num, den);
   const txt = v === null ? "—" : v.toFixed(2).replace(".", ",");
-  const cls = (v === null || !target) ? "neutral" : v >= target ? "green" : v > target * 0.7 ? "amber" : "red";
-  return `<div class="card"><p class="title">${esc(title)}</p><p class="sub">${esc(sub)}${target ? " · objetivo " + target + "%" : ""}</p>
+  // bandas (opcional): { verde: X, ambar: Y } → ≥X verde · entre Y y X ámbar · <Y rojo
+  const cls = v === null ? "neutral"
+    : bandas ? (v >= bandas.verde ? "green" : v >= bandas.ambar ? "amber" : "red")
+    : !target ? "neutral" : v >= target ? "green" : v > target * 0.7 ? "amber" : "red";
+  const ref = bandas ? " · bueno ≥" + bandas.verde + "%" : target ? " · objetivo " + target + "%" : "";
+  return `<div class="card"><p class="title">${esc(title)}</p><p class="sub">${esc(sub)}${ref}</p>
     <div class="num ${cls}">${txt}${v === null ? "" : "<small>%</small>"}</div><div class="foot">${esc(foot)}</div></div>`;
 }
 
@@ -192,7 +196,7 @@ function render(data) {
       numCard("Propuestas de llamada", sub, fmt(per.propuestas), "Según tabla CRM Mensual") +
       numCard("Llamadas agendadas", sub, per.agendadas, "Con " + s.nombre + " como setter") +
       numCard("Cierres setteados", sub, per.cierres, "Ventas con " + s.nombre + " como setter") +
-      pctCard("Respuesta a bienvenida", sub, per.respuestas, per.bienvenidas, per.bienvenidas ? miles(per.respuestas) + " respuestas de " + miles(per.bienvenidas) + " bienvenidas" : "Falta rellenar la tabla CRM Mensual") +
+      pctCard("Respuesta a bienvenida", sub, per.respuestas, per.bienvenidas, per.bienvenidas ? miles(per.respuestas) + " respuestas de " + miles(per.bienvenidas) + " bienvenidas" : "Falta rellenar la tabla CRM Mensual", null, { verde: 20, ambar: 10 }) +
       pctCard("Show up", sub, per.showup ? per.showup.realizadas : 0, per.showup ? per.showup.total : 0, per.showup && per.showup.total ? per.showup.realizadas + " de " + per.showup.total + " llamadas setteadas se presentaron" : "Aún sin llamadas con resultado", (data.objetivo || {}).showup) +
       '</div>';
     return fila("Métricas de " + esc(s.nombre) + " · esta semana", s.semana, rango, true) +
