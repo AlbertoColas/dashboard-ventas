@@ -192,6 +192,8 @@ function render(data) {
       numCard("Propuestas de llamada", sub, fmt(per.propuestas), "Según tabla CRM Mensual") +
       numCard("Llamadas agendadas", sub, per.agendadas, "Con " + s.nombre + " como setter") +
       numCard("Cierres setteados", sub, per.cierres, "Ventas con " + s.nombre + " como setter") +
+      pctCard("Respuesta a bienvenida", sub, per.respuestas, per.bienvenidas, per.bienvenidas ? miles(per.respuestas) + " respuestas de " + miles(per.bienvenidas) + " bienvenidas" : "Falta rellenar la tabla CRM Mensual") +
+      pctCard("Show up", sub, per.showup ? per.showup.realizadas : 0, per.showup ? per.showup.total : 0, per.showup && per.showup.total ? per.showup.realizadas + " de " + per.showup.total + " llamadas setteadas se presentaron" : "Aún sin llamadas con resultado", (data.objetivo || {}).showup) +
       '</div>';
     return fila("Métricas de " + esc(s.nombre) + " · esta semana", s.semana, rango, true) +
            fila("Métricas de " + esc(s.nombre) + " · " + mName, s.mes, "Acumulado de " + mName, false);
