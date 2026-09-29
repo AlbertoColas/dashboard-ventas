@@ -77,14 +77,14 @@ const esc = s => String(s).replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;",
 
 function pctCard(title, sub, num, den, foot, target, bandas) {
   const v = fmtPct(num, den);
-  const txt = v === null ? "—" : v.toFixed(2).replace(".", ",");
+  const txt = v === null ? "—" : v >= 99.995 ? "100" : v.toFixed(2).replace(".", ",");
   // bandas (opcional): { verde: X, ambar: Y } → ≥X verde · entre Y y X ámbar · <Y rojo
   const cls = v === null ? "neutral"
     : bandas ? (v >= bandas.verde ? "green" : v >= bandas.ambar ? "amber" : "red")
     : !target ? "neutral" : v >= target ? "green" : v > target * 0.7 ? "amber" : "red";
   const ref = bandas ? " · bueno ≥" + bandas.verde + "%" : target ? " · objetivo " + target + "%" : "";
   return `<div class="card"><p class="title">${esc(title)}</p><p class="sub">${esc(sub)}${ref}</p>
-    <div class="num ${cls}">${txt}${v === null ? "" : "<small>%</small>"}</div><div class="foot">${esc(foot)}</div></div>`;
+    <div class="num ${cls}${txt.length > 5 ? " long" : ""}">${txt}${v === null ? "" : "<small>%</small>"}</div><div class="foot">${esc(foot)}</div></div>`;
 }
 
 function miles(n) { return (n === null || n === undefined || isNaN(n)) ? n : Number(n).toLocaleString("de-DE"); }
