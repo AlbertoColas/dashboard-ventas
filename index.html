@@ -56,6 +56,24 @@
   .bar .mark { position: absolute; top: -4px; width: 2px; height: 14px; background: var(--muted); border-radius: 1px; }
   .red { color: var(--red); } .amber { color: var(--amber); } .green { color: var(--green); } .neutral { color: var(--neutral); }
   .err { font-size: 13px; color: var(--red); padding: 8px 2px; }
+  /* ---- Panel CEO ---- */
+  :root { --s1: #2a78d6; --s0: #c9c8c2; --grid: #ececea; }
+  @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) { --s1: #3987e5; --s0: #4b4a46; --grid: #2c2c2c; } }
+  :root[data-theme="dark"] { --s1: #3987e5; --s0: #4b4a46; --grid: #2c2c2c; }
+  body.ceo .std { display: none; }
+  .chart { background: var(--card); border: 1px solid var(--border); border-radius: 14px; box-shadow: var(--shadow); padding: 14px 16px 10px; margin-bottom: 18px; }
+  .chart svg { width: 100%; height: auto; display: block; overflow: visible; }
+  .chart .ax { font-size: 11px; fill: var(--muted); }
+  .chart .gl { stroke: var(--grid); stroke-width: 1; }
+  .legend { display: flex; gap: 14px; font-size: 12.5px; color: var(--muted); margin: 2px 0 6px; flex-wrap: wrap; }
+  .legend i { display: inline-block; width: 10px; height: 10px; border-radius: 3px; margin-right: 6px; vertical-align: -1px; }
+  .flow { display: flex; flex-wrap: wrap; align-items: stretch; gap: 6px; margin-bottom: 18px; }
+  .stage { background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 10px 12px; min-width: 96px; flex: 1 1 96px; }
+  .stage b { display: block; font-size: 24px; font-weight: 600; font-variant-numeric: tabular-nums; }
+  .stage span { font-size: 12.5px; color: var(--muted); }
+  .step { display: flex; flex-direction: column; justify-content: center; align-items: center; font-size: 12px; color: var(--muted); min-width: 46px; font-variant-numeric: tabular-nums; }
+  .step b { font-size: 13px; font-weight: 600; }
+  .note { font-size: 12px; color: var(--muted); margin: -10px 2px 18px; }
 </style>
 </head>
 <body>
@@ -63,13 +81,14 @@
     <span class="section" id="weekTitle">Objetivo de la semana</span>
     <span><span class="demo" id="demo">Datos de ejemplo · falta conectar Notion · </span><span class="stamp" id="stamp">Cargando datos del CRM…</span></span>
   </div>
-  <div class="grid" id="gridWeek"></div>
-  <div class="top"><span class="section" id="monthTitle">Objetivo del mes</span></div>
-  <div class="grid" id="gridMonth"></div>
-  <div id="ratiosBlock"><div class="top"><span class="section">Ratios</span></div>
+  <div class="grid std" id="gridWeek"></div>
+  <div class="top std"><span class="section" id="monthTitle">Objetivo del mes</span></div>
+  <div class="grid std" id="gridMonth"></div>
+  <div id="ratiosBlock" class="std"><div class="top"><span class="section">Ratios</span></div>
   <div class="grid" id="gridRatios"></div></div>
-  <div id="setters"></div>
-  <div id="closers"></div>
+  <div id="setters" class="std"></div>
+  <div id="closers" class="std"></div>
+  <div id="ceo"></div>
   <div class="err" id="err" hidden></div>
 
 <script>
@@ -154,6 +173,7 @@ function render(data) {
   document.getElementById("stamp").textContent = "Actualizado " +
     t.toLocaleTimeString("es-ES", { hour: "2-digit", minute: "2-digit", timeZone: "Europe/Madrid" });
 
+  if (VISTA === "ceo") { renderCEO(data, mName); return; }
   const obj = data.objetivo || {};
   document.getElementById("gridMonth").innerHTML =
     goalCard("Entrevistas agendadas", p.month.agendadasTotal != null ? p.month.agendadasTotal : p.month.agendadas, obj.agendadas, data.ritmo) +
@@ -222,12 +242,117 @@ function render(data) {
   }
 }
 
+// ============ PANEL CEO (?vista=ceo) ============
+const MES_C = ["Ene","Feb","Mar","Abr","May","Jun","Jul","Ago","Sep","Oct","Nov","Dic"];
+const eur = n => (n === null || n === undefined || isNaN(n)) ? "—" : Math.round(n).toLocaleString("de-DE") + " €";
+const pctTxt = (a, b) => b ? (a / b * 100).toFixed(1).replace(".", ",") + "%" : "—";
+const sec = t => '<div class="top"><span class="section">' + t + '</span></div>';
+
+function barChartCEO(act, prev, ano) {
+  const W = 640, H = 210, L = 44, R = 6, T = 8, B = 24;
+  const vals = act.concat(prev).filter(v => v != null);
+  const max = Math.max.apply(null, vals.concat([1]));
+  const step = max > 30000 ? 10000 : 5000, top = Math.ceil(max / step) * step;
+  const y = v => T + (H - T - B) * (1 - v / top), slot = (W - L - R) / 12, bw = Math.min(16, slot / 2 - 3);
+  let s = '<svg viewBox="0 0 ' + W + ' ' + H + '" role="img" aria-label="Facturación mensual ' + ano + ' frente a ' + (ano - 1) + '">';
+  for (let v = 0; v <= top; v += step) s += '<line class="gl" x1="' + L + '" x2="' + (W - R) + '" y1="' + y(v) + '" y2="' + y(v) + '"/><text class="ax" x="' + (L - 6) + '" y="' + (y(v) + 4) + '" text-anchor="end">' + (v / 1000) + 'k</text>';
+  const bar = (x, v, col, lab) => {
+    if (v == null) return "";
+    const yy = y(v), h = Math.max(0, y(0) - yy), r = Math.min(4, h);
+    const d = "M" + x + "," + y(0) + " V" + (yy + r) + " Q" + x + "," + yy + " " + (x + r) + "," + yy + " H" + (x + bw - r) + " Q" + (x + bw) + "," + yy + " " + (x + bw) + "," + (yy + r) + " V" + y(0) + " Z";
+    return '<path d="' + d + '" fill="' + col + '"><title>' + lab + ": " + eur(v) + '</title></path>';
+  };
+  for (let i = 0; i < 12; i++) {
+    const cx = L + slot * i + slot / 2;
+    s += bar(cx - bw - 1, prev[i], "var(--s0)", MES_C[i] + " " + (ano - 1));
+    s += bar(cx + 1, act[i], "var(--s1)", MES_C[i] + " " + ano);
+    s += '<text class="ax" x="' + cx + '" y="' + (H - 6) + '" text-anchor="middle">' + MES_C[i] + '</text>';
+  }
+  return s + '</svg>';
+}
+
+function flowCEO(stages) {
+  let h = '<div class="flow">';
+  stages.forEach((st, i) => {
+    if (i > 0) { const pr = stages[i - 1].n; h += '<div class="step"><b>' + pctTxt(st.n, pr) + '</b>→</div>'; }
+    h += '<div class="stage"><b>' + (st.n == null ? "—" : Number(st.n).toLocaleString("de-DE")) + '</b><span>' + esc(st.l) + '</span></div>';
+  });
+  return h + '</div>';
+}
+
+function renderCEO(data, mName) {
+  document.body.classList.add("ceo");
+  document.getElementById("weekTitle").textContent = "Panel CEO · " + mName;
+  const c = data.ceo || {}, p = data.periods, obj = data.objetivo || {}, O = c.objetivos || {};
+  const d = c.dinero, cl = c.clientas, em = c.embudo || {};
+  const bm = (data.mes && data.mes.m) || Number(data.today.slice(5, 7));
+  let h = "";
+  // 1) Objetivos del año
+  let g = "";
+  if (d) g += goalCard("Facturación " + d.ano + " (€)", Math.round(d.ytd), O.facturacionAnual, d.ritmoAno);
+  if (cl) g += goalCard("Clientas activas", cl.activas, O.clientasActivas, { elapsed: 0, total: 0, startLabel: "Objetivo del año" });
+  g += goalCard("Ventas " + mName, p.month.ventas, obj.cierresMin, data.ritmo, obj.cierresMax);
+  if (d) {
+    const ben = d.meses.reduce((s, x) => s + (x && x.beneficio != null ? x.beneficio : 0), 0);
+    g += numCard("Beneficio " + d.ano, "Acumulado del año", eur(ben), "Margen " + pctTxt(ben, d.ytd) + " sobre facturación");
+  }
+  h += sec("Objetivos " + data.today.slice(0, 4)) + '<div class="grid">' + g + '</div>';
+  // 2) Dinero del mes
+  if (d) {
+    let i = bm - 1; if (!d.meses[i]) { for (i = d.meses.length - 1; i >= 0 && !d.meses[i]; i--); }
+    const mm = i >= 0 ? d.meses[i] : null, nm = MONTHS[i] || mName, prevMes = d.mesesAnterior[i];
+    const nCon = d.meses.reduce((k, x, j) => x && x.ingresos != null ? j + 1 : k, 0);
+    const ytdPrev = d.mesesAnterior.slice(0, nCon).reduce((s, x) => s + (x || 0), 0);
+    if (mm) {
+      const cac = p.month.ventas ? ((mm.ads || 0) + (mm.captacion || 0)) / p.month.ventas : null;
+      h += sec("Dinero · " + nm + " (BALANCE ECONÓMICO)") + '<div class="grid">' +
+        numCard("Facturación " + nm, "Mes natural", eur(mm.ingresos), prevMes ? (mm.ingresos >= prevMes ? "+" : "") + pctTxt(mm.ingresos - prevMes, prevMes) + " vs " + nm + " " + (d.ano - 1) + " (" + eur(prevMes) + ")" : "") +
+        numCard("Gastos " + nm, "Del negocio", eur(mm.gastos), "") +
+        numCard("Beneficio " + nm, "Ingresos − gastos", eur(mm.beneficio), "Margen " + pctTxt(mm.beneficio, mm.ingresos)) +
+        numCard("Publicidad " + nm, "Facebook Ads", eur(mm.ads), "Equipo de captación: " + eur(mm.captacion)) +
+        numCard("Coste por venta", "Publicidad + captación", eur(cac), p.month.ventas + " ventas en " + mName) +
+        '</div>';
+    }
+    h += sec("Facturación mensual " + d.ano + " vs " + (d.ano - 1)) + '<div class="chart"><div class="legend"><span><i style="background:var(--s1)"></i>' + d.ano + '</span><span><i style="background:var(--s0)"></i>' + (d.ano - 1) + '</span><span>Hasta ' + MONTHS[nCon - 1] + ': ' + eur(d.ytd) + ' vs ' + eur(ytdPrev) + ' (' + (d.ytd >= ytdPrev ? "+" : "") + pctTxt(d.ytd - ytdPrev, ytdPrev) + ')</span></div>' +
+      barChartCEO(d.meses.map(x => x ? x.ingresos : null), d.mesesAnterior, d.ano) + '</div>';
+  } else if (c.dineroError) h += sec("Dinero") + '<div class="note" style="margin-top:0">No se pudo leer BALANCE ECONÓMICO (' + esc(c.dineroError) + ')</div>';
+  // 3) Clientas
+  if (cl) {
+    const r = cl.renovaciones || {}, neto = cl.altasMes - cl.bajasMes;
+    h += sec("Clientas · " + mName) + '<div class="grid">' +
+      numCard("Activas ahora", "Estado ALTA en el CRM", cl.activas, "Objetivo: " + (O.clientasActivas || "—")) +
+      numCard("Altas", "Acumulado de " + mName, cl.altasMes, "Nuevas clientas") +
+      numCard("Bajas", "Acumulado de " + mName, cl.bajasMes, "Con fecha de baja") +
+      numCard("Crecimiento neto", "Altas − bajas", (neto > 0 ? "+" : "") + neto, neto >= 0 ? "Crece la base" : "Se reduce la base") +
+      (r.encontrado ? pctCard("Renovaciones", r.mes.toLowerCase(), r.renovadas, r.aRenovar, r.renovadas + " de " + r.aRenovar + " renuevan") : "") +
+      '</div>';
+  }
+  // 4) Embudo completo
+  h += sec("Embudo de " + mName + " · captación por DM (Skalex)") + flowCEO([
+    { l: "Bienvenidas", n: em.bienvenidas }, { l: "Responden", n: em.respuestas }, { l: "Propuesta de llamada", n: em.propuestas },
+    { l: "Aceptan", n: em.aceptan }, { l: "Agendan", n: data.skalex && data.skalex.mes ? data.skalex.mes.agendan : null } ]);
+  h += sec("Embudo de " + mName + " · llamadas (CRM)") + flowCEO([
+    { l: "Entrevistas agendadas", n: em.agendadas }, { l: "Realizadas", n: em.realizadas }, { l: "Ventas", n: em.ventas } ]);
+  h += '<div class="note">Las entrevistas del CRM incluyen todas las vías (DM, formularios, inbound), por eso son más que las agendadas desde la propuesta por DM.</div>';
+  // 5) Equipo
+  const pa = (data.closers || [])[0], la = data.skalex && data.skalex.mes;
+  h += sec("Equipo · " + mName) + '<div class="grid">' +
+    (pa ? pctCard("Cierre · " + pa.nombre, "Acumulado de " + mName, pa.periods.month.ventas, pa.periods.month.asistidas, pa.periods.month.ventas + " ventas de " + pa.periods.month.asistidas + " llamadas", obj.cierrePctMin) : "") +
+    pctCard("Show up", "Acumulado de " + mName, p.month.asistidas, p.month.agendadas, p.month.asistidas + " de " + p.month.agendadas + " se presentaron", obj.showup) +
+    pctCard("Respuesta a bienvenida · Laura", "Skalex · " + mName, em.respuestas, em.bienvenidas, (em.respuestas || 0).toLocaleString("de-DE") + " de " + (em.bienvenidas || 0).toLocaleString("de-DE"), null, { verde: 20, ambar: 10 }) +
+    (la ? pctCard("Propuesta → Agenda · Laura", "Skalex · " + mName, la.agendan, la.propuestas, la.agendan + " de " + la.propuestas + " propuestas", null, { verde: 35, ambar: 15 }) : "") +
+    '</div>';
+  const errs = [c.clientasError, c.embudoError, c.embudo && c.embudo.skalexError].filter(Boolean);
+  if (errs.length) h += '<div class="note">' + esc(errs.join(" · ")) + '</div>';
+  document.getElementById("ceo").innerHTML = h;
+}
+
 const API = "https://script.google.com/macros/s/AKfycbxWSdheRFPwOYmyp8M4936GVyqja6qCNxXYe6JKiPp2t9iHZnGIHvNUJgFL9s3IZ5RHXg/exec?format=json";
 let VISTA = new URLSearchParams(location.search).get("vista") || "";
 function onData(data) { const err = document.getElementById("err"); err.hidden = true; render(data); const avisos = []; if (data.pagosError) avisos.push("Pago único no disponible (" + data.pagosError + ")"); if (data.setterError && VISTA === "setter") avisos.push("Métricas de setter no disponibles (" + data.setterError + ")"); if (data.objetivoSemanaError) avisos.push("Objetivo semanal no disponible (" + data.objetivoSemanaError + ")"); if (data.objetivoError) avisos.push("Objetivos no disponibles (" + data.objetivoError + ")"); if (avisos.length) { err.textContent = avisos.join(" · "); err.hidden = false; } }
 function load() {
   const err = document.getElementById("err");
-  fetch(API + "&t=" + Date.now(), { credentials: "omit", cache: "no-store" })
+  fetch(API + (VISTA === "ceo" ? "&vista=ceo" : "") + "&t=" + Date.now(), { credentials: "omit", cache: "no-store" })
     .then(r => r.json())
     .then(data => { if (data.error) throw new Error(data.error); onData(data); })
     .catch(e => { err.textContent = "No se pudieron cargar las métricas (" + (e && e.message || e) + "). Reintentando…"; err.hidden = false; });
