@@ -145,7 +145,8 @@ function numCard(title, sub, value, foot) {
 
 function render(data) {
   const p = data.periods;
-  const mIdx = Number(data.today.slice(5, 7)) - 1;
+  // Mes de negocio (semanas L-D en el mes de su miércoles); si no viene, mes natural
+  const mIdx = (data.mes && data.mes.m ? data.mes.m : Number(data.today.slice(5, 7))) - 1;
   const mName = MONTHS[mIdx];
   document.getElementById("monthTitle").textContent = `Objetivo de ${mName}`;
   document.getElementById("demo").style.display = data.demo ? "inline" : "none";
