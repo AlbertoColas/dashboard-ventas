@@ -204,6 +204,17 @@ function render(data) {
     return fila("Métricas de " + esc(s.nombre) + " · esta semana", s.semana, rango, true) +
            fila("Métricas de " + esc(s.nombre) + " · " + mName, s.mes, "Acumulado de " + mName, false);
   }).join("");
+  // Embudo de llamada (Skalex): HOT LEAD → LAURA → LLAMADA AGENDADA
+  if (esSetter) {
+    const embudo = (titulo, e, sub) => '<div class="top"><span class="section">' + titulo + '</span></div><div class="grid">' +
+      pctCard("Propuesta → Acepta llamada", sub, e.aceptan, e.propuestas, e.propuestas ? e.aceptan + " de " + e.propuestas + " propuestas aceptan (pasan a Laura)" : "Aún sin propuestas") +
+      pctCard("Acepta → Agenda llamada", sub, e.aceptanAgendan, e.aceptan, e.aceptan ? e.aceptanAgendan + " de " + e.aceptan + " que aceptaron agendan" : "Aún nadie ha aceptado") +
+      pctCard("Propuesta → Agenda llamada", sub, e.agendan, e.propuestas, e.propuestas ? e.agendan + " de " + e.propuestas + " propuestas acaban agendando" : "Aún sin propuestas") +
+      '</div>';
+    document.getElementById("setters").innerHTML += data.skalex
+      ? embudo("Embudo de llamada · esta semana (Skalex)", data.skalex.semana, rango) + embudo("Embudo de llamada · " + mName + " (Skalex)", data.skalex.mes, "Acumulado de " + mName)
+      : '<div class="top"><span class="section">Embudo de llamada (Skalex)</span></div><div class="foot" style="margin:0 2px 18px">' + esc(data.skalexError || "Skalex no disponible") + '</div>';
+  }
   if (esSetter && data.setters && data.setters[0]) {
     const s0 = data.setters[0], bso = data.bienvenidasSemanaObjetivo;
     document.getElementById("gridMonth").innerHTML += goalCard("Bienvenidas", s0.mes.bienvenidas || 0, obj.bienvenidas, data.ritmo);
