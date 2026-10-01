@@ -160,7 +160,7 @@ function fmtRange(a, b) {
 }
 
 function numCard(title, sub, value, foot) {
-  return '<div class="card"><p class="title">' + esc(title) + '</p><p class="sub">' + esc(sub) + '</p><div class="num neutral">' + value + '</div><div class="foot">' + esc(foot) + '</div></div>';
+  return '<div class="card"><p class="title">' + esc(title) + '</p><p class="sub">' + esc(sub) + '</p><div class="num neutral' + (String(value).length > 8 ? ' long xlong' : String(value).length > 5 ? ' long' : '') + '">' + value + '</div><div class="foot">' + esc(foot) + '</div></div>';
 }
 
 function render(data) {
