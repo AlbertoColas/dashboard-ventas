@@ -207,9 +207,9 @@ function render(data) {
   // Embudo de llamada (Skalex): HOT LEAD → LAURA → LLAMADA AGENDADA
   if (esSetter) {
     const embudo = (titulo, e, sub) => '<div class="top"><span class="section">' + titulo + '</span></div><div class="grid">' +
-      pctCard("Propuesta → Acepta llamada", sub, e.aceptan, e.propuestas, e.propuestas ? e.aceptan + " de " + e.propuestas + " propuestas aceptan (pasan a Laura)" : "Aún sin propuestas") +
-      pctCard("Acepta → Agenda llamada", sub, e.aceptanAgendan, e.aceptan, e.aceptan ? e.aceptanAgendan + " de " + e.aceptan + " que aceptaron agendan" : "Aún nadie ha aceptado") +
-      pctCard("Propuesta → Agenda llamada", sub, e.agendan, e.propuestas, e.propuestas ? e.agendan + " de " + e.propuestas + " propuestas acaban agendando" : "Aún sin propuestas") +
+      pctCard("Propuesta → Acepta llamada", sub, e.aceptan, e.propuestas, e.propuestas ? e.aceptan + " de " + e.propuestas + " propuestas aceptan (pasan a Laura)" : "Aún sin propuestas", null, { verde: 45, ambar: 30 }) +
+      pctCard("Acepta → Agenda llamada", sub, e.aceptanAgendan, e.aceptan, e.aceptan ? e.aceptanAgendan + " de " + e.aceptan + " que aceptaron agendan" : "Aún nadie ha aceptado", null, { verde: 80, ambar: 60 }) +
+      pctCard("Propuesta → Agenda llamada", sub, e.agendan, e.propuestas, e.propuestas ? e.agendan + " de " + e.propuestas + " propuestas acaban agendando" : "Aún sin propuestas", null, { verde: 35, ambar: 15 }) +
       '</div>';
     document.getElementById("setters").innerHTML += data.skalex
       ? embudo("Embudo de llamada · esta semana (Skalex)", data.skalex.semana, rango) + embudo("Embudo de llamada · " + mName + " (Skalex)", data.skalex.mes, "Acumulado de " + mName)
