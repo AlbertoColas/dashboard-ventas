@@ -438,9 +438,17 @@ function renderServicio(d) {
     bigCard("Cumplimiento", "TrainerStudio · últimos 30 días", nf(cu.cumplimiento, 1), "%", sem(cu.cumplimiento, O.cumplimiento, 10), "Media de " + (cu.n || 0) + " clientas activas", "objetivo " + O.cumplimiento + "%") +
     bigCard("Renovación " + (rm ? rm.nombre.toLowerCase() : "del mes"), "Clientas que tocaba renovar", nf(rmP), "%", sem(rmP, O.renovacion, 15), rm ? rm.renovadas + " de " + rm.aRenovar + " renuevan" : "Sin página del mes", "objetivo " + O.renovacion + "%") +
     bigCard("Renovación " + (rn.anio ? rn.anio.y : ""), "Acumulado del año", nf(raP, 1), "%", sem(raP, O.renovacion, 15), rn.anio ? rn.anio.renovadas + " de " + rn.anio.aRenovar + " renuevan" : "", "objetivo " + O.renovacion + "%") +
-    bigCard("LTV", "Meses que se queda una clienta", nf(lt.meses && lt.meses.media, 1), " meses", "neutral", "Mediana " + nf(lt.meses && lt.meses.mediana, 1) + " · " + (lt.meses ? lt.meses.n : 0) + " clientas que ya terminaron (desde dic-2022)") +
-    bigCard("LTV en €", "Lo que paga de media una clienta", lt.eur ? nf(lt.eur.media) : null, " €", "neutral", "Mediana " + (lt.eur ? nf(lt.eur.mediana) : "—") + " € · " + (lt.eur ? lt.eur.n : 0) + " clientas con pagos registrados") +
     '</div>';
+  // 1b) LTV: general (desde dic-2022) y últimos 2 años
+  if (lt.meses) {
+    const u = lt.ultimos2 || {}, dif = (x, y, suf, dec) => (x == null || y == null) ? "" : " · " + (x - y >= 0 ? "+" : "−") + nf(Math.abs(x - y), dec) + suf + " vs general";
+    h += sec("LTV · cuánto se queda y cuánto paga una clienta") + '<div class="grid">' +
+      bigCard("LTV general", "Meses · desde dic-2022", nf(lt.meses.media, 1), " meses", "neutral", "Mediana " + nf(lt.meses.mediana, 1) + " · " + lt.meses.n + " clientas que ya terminaron") +
+      bigCard("LTV general en €", "Pagado de media · desde dic-2022", lt.eur ? nf(lt.eur.media) : null, " €", "neutral", "Mediana " + (lt.eur ? nf(lt.eur.mediana) : "—") + " € · " + (lt.eur ? lt.eur.n : 0) + " clientas con pagos") +
+      (u.meses ? bigCard("LTV últimos 2 años", "Meses · terminaron desde " + fdate(u.desde), nf(u.meses.media, 1), " meses", "neutral", "Mediana " + nf(u.meses.mediana, 1) + " · " + u.meses.n + " clientas" + dif(u.meses.media, lt.meses.media, " meses", 1)) : "") +
+      (u.eur ? bigCard("LTV últimos 2 años en €", "Pagado de media · terminaron desde " + fdate(u.desde), nf(u.eur.media), " €", "neutral", "Mediana " + nf(u.eur.mediana) + " € · " + u.eur.n + " clientas" + dif(u.eur.media, lt.eur && lt.eur.media, " €", 0)) : "") +
+      '</div>';
+  }
   // 2) Histórico de éxito
   if (ex.historico && ex.historico.length > 1) {
     const hs = ex.historico, f0 = hs[0], f1 = hs[hs.length - 1];
@@ -501,7 +509,7 @@ function renderServicio(d) {
     bigCard("Cintura", "Media clientas activas", cu.cm != null ? nf(cu.cm, 1) : null, " cm", "neutral", "Desde su primera medición en TrainerStudio") +
     bigCard("Clientas activas", "Estado ALTA en el CRM", ac.total, "", "neutral", COA.map(k => k + " " + ((ac.porCoach || {})[k] || 0)).join(" · ")) +
     '</div>';
-  h += '<div class="note" style="margin-top:-6px">Notion y Client Vision se leen en directo (caché de 3 h). TrainerStudio se copia cada mañana: datos del ' + fdate(d.tsActualizado) + '. El LTV solo cuenta clientas desde dic-2022 (antes no había datos completos en Notion).</div>';
+  h += '<div class="note" style="margin-top:-6px">Notion y Client Vision se leen en directo (caché de 3 h). TrainerStudio se copia cada mañana: datos del ' + fdate(d.tsActualizado) + '. El LTV solo cuenta clientas desde dic-2022 (antes no había datos completos en Notion); el de los últimos 2 años, las que terminaron en ese periodo (si no tienen fecha de baja, se toma su último mes con cumplimiento).</div>';
   document.getElementById("ceo").innerHTML = h;
   const t = new Date(d.updatedAt);
   document.getElementById("stamp").textContent = "Actualizado " + t.toLocaleString("es-ES", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit", timeZone: "Europe/Madrid" });
