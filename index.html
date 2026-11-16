@@ -75,6 +75,21 @@
   .step { display: flex; flex-direction: column; justify-content: center; align-items: center; font-size: 12px; color: var(--muted); min-width: 46px; font-variant-numeric: tabular-nums; }
   .step b { font-size: 13px; font-weight: 600; }
   .note { font-size: 12px; color: var(--muted); margin: -10px 2px 18px; }
+  /* ---- Panel Servicio ---- */
+  .tbl { width: 100%; border-collapse: collapse; font-size: 13.5px; font-variant-numeric: tabular-nums; }
+  .tbl th { text-align: left; font-weight: 600; font-size: 12px; color: var(--muted); padding: 6px 8px; border-bottom: 1px solid var(--border); white-space: nowrap; }
+  .tbl td { padding: 7px 8px; border-bottom: 1px solid var(--border); }
+  .tbl tr:last-child td { border-bottom: 0; }
+  .tbl td.n, .tbl th.n { text-align: right; }
+  .tbl b.red, .tbl b.amber, .tbl b.green { font-weight: 600; }
+  .box { background: var(--card); border: 1px solid var(--border); border-radius: 14px; box-shadow: var(--shadow); padding: 8px 10px; margin-bottom: 18px; overflow-x: auto; }
+  .coach h3 { font-size: 16px; margin: 0 0 2px; } .coach .sub { margin-bottom: 8px; }
+  .kv { display: flex; justify-content: space-between; gap: 8px; font-size: 13.5px; padding: 5px 0; border-top: 1px solid var(--border); font-variant-numeric: tabular-nums; }
+  .kv span:first-child { color: var(--muted); } .kv span:last-child { font-weight: 600; }
+  .dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: currentColor; margin-right: 6px; vertical-align: 1px; }
+  .pill { display: inline-block; font-size: 11.5px; padding: 1px 7px; border-radius: 99px; border: 1px solid var(--border); color: var(--muted); }
+  .two { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 12px; }
+  .two > div { min-width: 0; }
 </style>
 </head>
 <body>
@@ -348,12 +363,155 @@ function renderCEO(data, mName) {
   document.getElementById("ceo").innerHTML = h;
 }
 
+// ============ PANEL SERVICIO (?vista=servicio&k=…) · solo Alberto ============
+const nf = (x, d) => (x === null || x === undefined || isNaN(x)) ? "—" : Number(x).toLocaleString("es-ES", { minimumFractionDigits: d || 0, maximumFractionDigits: d || 0 });
+const fdate = s => s ? s.slice(8, 10) + "/" + s.slice(5, 7) + "/" + s.slice(0, 4) : "";
+// Semáforo: más alto es mejor (o más bajo si inv). Ámbar dentro de la banda "amb".
+function sem(v, obj, amb, inv) {
+  if (v === null || v === undefined || isNaN(v) || obj === null || obj === undefined) return "neutral";
+  if (inv) return v <= obj ? "green" : v <= obj + amb ? "amber" : "red";
+  return v >= obj ? "green" : v >= obj - amb ? "amber" : "red";
+}
+const pc = (a, b) => b ? a / b * 100 : null;
+function bigCard(title, sub, val, unit, cls, foot, target) {
+  const txt = val === null || val === undefined ? "—" : val;
+  return '<div class="card"><p class="title">' + esc(title) + '</p><p class="sub">' + esc(sub) + (target ? " · " + esc(target) : "") + '</p>' +
+    '<div class="num ' + cls + (String(txt).length > 6 ? " long" : "") + '">' + txt + (unit && txt !== "—" ? "<small>" + unit + "</small>" : "") + '</div><div class="foot">' + foot + '</div></div>';
+}
+function lineExito(hist, obj, objRev) {
+  if (!hist || hist.length < 2) return "";
+  const W = 640, H = 220, L = 38, R = 14, T = 12, B = 26, lo = 50, hi = 85;
+  const n = hist.length, x = i => L + (W - L - R) * i / (n - 1), y = v => T + (H - T - B) * (1 - (v - lo) / (hi - lo));
+  let s = '<svg viewBox="0 0 ' + W + ' ' + H + '" role="img" aria-label="Histórico del % de éxito por revisión">';
+  for (let v = lo; v <= hi; v += 5) s += '<line class="gl" x1="' + L + '" x2="' + (W - R) + '" y1="' + y(v) + '" y2="' + y(v) + '"/><text class="ax" x="' + (L - 6) + '" y="' + (y(v) + 4) + '" text-anchor="end">' + v + '%</text>';
+  s += '<line x1="' + L + '" x2="' + (W - R) + '" y1="' + y(obj) + '" y2="' + y(obj) + '" stroke="var(--green)" stroke-dasharray="5 4" stroke-width="1.5"/><text class="ax" x="' + (W - R) + '" y="' + (y(obj) - 5) + '" text-anchor="end" style="fill:var(--green)">Objetivo ' + obj + '%</text>';
+  if (objRev) s += '<line x1="' + L + '" x2="' + (W - R) + '" y1="' + y(objRev.obj) + '" y2="' + y(objRev.obj) + '" stroke="var(--amber)" stroke-dasharray="2 4" stroke-width="1.5"/><text class="ax" x="' + (W - R) + '" y="' + (y(objRev.obj) - 5) + '" text-anchor="end" style="fill:var(--amber)">Próxima revisión ' + fdate(objRev.fecha) + ': ' + objRev.obj + '%</text>';
+  s += '<polyline fill="none" stroke="var(--s1)" stroke-width="2.5" stroke-linejoin="round" points="' + hist.map((h, i) => x(i) + "," + y(h.pct)).join(" ") + '"/>';
+  hist.forEach((h, i) => {
+    const last = i === n - 1;
+    s += '<circle cx="' + x(i) + '" cy="' + y(h.pct) + '" r="' + (last ? 5 : 3.5) + '" fill="var(--s1)" stroke="var(--card)" stroke-width="1.5"><title>' + fdate(h.fecha) + ": " + nf(h.pct, 2) + "% (" + h.si + " de " + h.total + ')</title></circle>';
+    if (last || i === 0) s += '<text class="ax" x="' + x(i) + '" y="' + (y(h.pct) - 10) + '" text-anchor="' + (last ? "end" : "start") + '" style="fill:var(--text);font-weight:600">' + nf(h.pct, 1) + '%</text>';
+    if (i % 2 === 0 || last) s += '<text class="ax" x="' + x(i) + '" y="' + (H - 6) + '" text-anchor="middle">' + MES_C[Number(h.fecha.slice(5, 7)) - 1] + " " + h.fecha.slice(2, 4) + '</text>';
+  });
+  return s + '</svg>';
+}
+function barsRenov(meses, obj) {
+  if (!meses || !meses.length) return "";
+  const W = 640, H = 190, L = 38, R = 6, T = 14, B = 24, y = v => T + (H - T - B) * (1 - v / 100), slot = (W - L - R) / 12, bw = Math.min(26, slot - 10);
+  let s = '<svg viewBox="0 0 ' + W + ' ' + H + '" role="img" aria-label="% de renovación por mes">';
+  for (let v = 0; v <= 100; v += 25) s += '<line class="gl" x1="' + L + '" x2="' + (W - R) + '" y1="' + y(v) + '" y2="' + y(v) + '"/><text class="ax" x="' + (L - 6) + '" y="' + (y(v) + 4) + '" text-anchor="end">' + v + '%</text>';
+  s += '<line x1="' + L + '" x2="' + (W - R) + '" y1="' + y(obj) + '" y2="' + y(obj) + '" stroke="var(--green)" stroke-dasharray="5 4" stroke-width="1.5"/>';
+  meses.forEach(m => {
+    const v = pc(m.renovadas, m.aRenovar), cx = L + slot * (m.m - 1) + slot / 2;
+    if (v !== null) {
+      const yy = y(v), col = v >= obj ? "var(--green)" : v >= obj - 15 ? "var(--amber)" : "var(--red)";
+      s += '<rect x="' + (cx - bw / 2) + '" y="' + yy + '" width="' + bw + '" height="' + Math.max(0, y(0) - yy) + '" rx="3" fill="' + col + '"><title>' + MES_C[m.m - 1] + ": " + m.renovadas + " de " + m.aRenovar + " (" + nf(v) + '%)</title></rect>';
+      s += '<text class="ax" x="' + cx + '" y="' + (yy - 4) + '" text-anchor="middle">' + m.renovadas + '/' + m.aRenovar + '</text>';
+    }
+    s += '<text class="ax" x="' + cx + '" y="' + (H - 6) + '" text-anchor="middle">' + MES_C[m.m - 1] + '</text>';
+  });
+  return s + '</svg>';
+}
+function renderServicio(d) {
+  document.body.classList.add("ceo");
+  document.title = "Servicio · programa y coaches";
+  document.getElementById("weekTitle").textContent = "Servicio · programa y coaches";
+  const O = d.objetivos || {}, ex = d.exito || {}, ad = d.adherencia || {}, ab = d.abandono || {}, sa = d.satisfaccion || {},
+    cu = d.cumplimiento || {}, rn = d.renovacion || {}, lt = d.ltv || {}, ac = d.activas || {};
+  const COA = ["Antonio", "Sergio", "Alberto"];
+  let h = "";
+  // 1) Tarjetas grandes
+  const abT = pc(ab.total && ab.total.ab, ab.total && ab.total.n), abA = pc(ab.anio && ab.anio.ab, ab.anio && ab.anio.n);
+  const rm = rn.mes, rmP = rm ? pc(rm.renovadas, rm.aRenovar) : null, raP = rn.anio ? pc(rn.anio.renovadas, rn.anio.aRenovar) : null;
+  const rev = O.exitoRevision;
+  h += sec("Programa · cómo estamos hoy") + '<div class="grid">' +
+    bigCard("% de éxito", "Clientas revisadas", nf(ex.pct, 2), "%", sem(ex.pct, O.exito, 8), (ex.si || 0) + " SÍ de " + ((ex.si || 0) + (ex.no || 0)) + (rev ? " · revisión " + fdate(rev.fecha) + ": " + rev.obj + "%" : ""), "objetivo " + O.exito + "%") +
+    bigCard("Adherencia", "Acaban su programa inicial", nf(ad.pct, 1), "%", sem(ad.pct, O.adherencia, 8), ad.ok + " de " + ad.n + " que empezaron hace ≥ 6 meses", "objetivo " + O.adherencia + "%") +
+    bigCard("Abandono total", "Desde que hay CRM", nf(abT, 1), "%", sem(abT, O.abandono, 4, true), (ab.total ? ab.total.ab + " de " + ab.total.n + " clientas" : ""), "máx. " + O.abandono + "%") +
+    bigCard("Abandono " + (ab.anio ? ab.anio.y : ""), "Clientas que empezaron este año", nf(abA, 1), "%", sem(abA, O.abandono, 4, true), (ab.anio ? ab.anio.ab + " de " + ab.anio.n + " clientas" : ""), "máx. " + O.abandono + "%") +
+    bigCard("Satisfacción con el coach", "Client Vision · media", nf(sa.coach && sa.coach.media, 2), "", sem(sa.coach && sa.coach.media, O.satisfaccion, 1), (sa.coach ? sa.coach.n : 0) + " respuestas", "objetivo " + nf(O.satisfaccion, 1)) +
+    bigCard("Satisfacción con el programa", "Client Vision · media", nf(sa.programa && sa.programa.media, 2), "", sem(sa.programa && sa.programa.media, O.satisfaccion, 1), (sa.programa ? sa.programa.n : 0) + " respuestas", "objetivo " + nf(O.satisfaccion, 1)) +
+    bigCard("Satisfacción con los resultados", "Client Vision · media", nf(sa.resultados && sa.resultados.media, 2), "", sem(sa.resultados && sa.resultados.media, O.satisfaccion, 1), (sa.resultados ? sa.resultados.n : 0) + " respuestas", "objetivo " + nf(O.satisfaccion, 1)) +
+    bigCard("Cumplimiento", "TrainerStudio · últimos 30 días", nf(cu.cumplimiento, 1), "%", sem(cu.cumplimiento, O.cumplimiento, 10), "Media de " + (cu.n || 0) + " clientas activas", "objetivo " + O.cumplimiento + "%") +
+    bigCard("Renovación " + (rm ? rm.nombre.toLowerCase() : "del mes"), "Clientas que tocaba renovar", nf(rmP), "%", sem(rmP, O.renovacion, 15), rm ? rm.renovadas + " de " + rm.aRenovar + " renuevan" : "Sin página del mes", "objetivo " + O.renovacion + "%") +
+    bigCard("Renovación " + (rn.anio ? rn.anio.y : ""), "Acumulado del año", nf(raP, 1), "%", sem(raP, O.renovacion, 15), rn.anio ? rn.anio.renovadas + " de " + rn.anio.aRenovar + " renuevan" : "", "objetivo " + O.renovacion + "%") +
+    bigCard("LTV", "Meses que se queda una clienta", nf(lt.meses && lt.meses.media, 1), " meses", "neutral", "Mediana " + nf(lt.meses && lt.meses.mediana, 1) + " · " + (lt.meses ? lt.meses.n : 0) + " clientas que ya terminaron (desde dic-2022)") +
+    bigCard("LTV en €", "Lo que paga de media una clienta", lt.eur ? nf(lt.eur.media) : null, " €", "neutral", "Mediana " + (lt.eur ? nf(lt.eur.mediana) : "—") + " € · " + (lt.eur ? lt.eur.n : 0) + " clientas con pagos registrados") +
+    '</div>';
+  // 2) Histórico de éxito
+  if (ex.historico && ex.historico.length > 1) {
+    const hs = ex.historico, f0 = hs[0], f1 = hs[hs.length - 1];
+    h += sec("% de éxito · histórico de revisiones") + '<div class="chart"><div class="legend"><span><i style="background:var(--s1)"></i>% de éxito en cada revisión</span><span>De ' + nf(f0.pct, 1) + '% (' + fdate(f0.fecha) + ') a ' + nf(f1.pct, 1) + '% (' + fdate(f1.fecha) + ') · ' + (f1.pct >= f0.pct ? "+" : "") + nf(f1.pct - f0.pct, 1) + ' puntos</span></div>' + lineExito(hs, O.exito, rev) + '</div>';
+  }
+  // 3) Por coach
+  h += sec("Por coach") + '<div class="grid">' + COA.map(k => {
+    const e = (ex.porCoach || {})[k] || { si: 0, no: 0 }, a = (ad.porCoach || {})[k] || { n: 0, ok: 0 }, b = (ab.porCoach || {})[k] || { total: { n: 0, ab: 0 }, anio: { n: 0, ab: 0 } };
+    const s = (sa.porCoach || {})[k] || {}, c = (cu.porCoach || {})[k] || {};
+    const eP = pc(e.si, e.si + e.no), aP = pc(a.ok, a.n), bT = pc(b.total.ab, b.total.n), bA = pc(b.anio.ab, b.anio.n);
+    const kv = (l, v, cls) => '<div class="kv"><span>' + l + '</span><span class="' + (cls || "") + '">' + (cls && cls !== "neutral" ? '<i class="dot"></i>' : "") + v + '</span></div>';
+    return '<div class="card coach"><h3>' + k + '</h3><p class="sub">' + ((ac.porCoach || {})[k] || 0) + ' clientas activas' + (k === "Alberto" ? " · incluye antiguas sin coach" : "") + '</p>' +
+      kv("% de éxito", nf(eP, 1) + "% <span class='pill'>" + e.si + "/" + (e.si + e.no) + "</span>", sem(eP, O.exito, 8)) +
+      kv("Adherencia", nf(aP, 1) + "% <span class='pill'>" + a.ok + "/" + a.n + "</span>", sem(aP, O.adherencia, 8)) +
+      kv("Abandono total", nf(bT, 1) + "% <span class='pill'>" + b.total.ab + "/" + b.total.n + "</span>", sem(bT, O.abandono, 4, true)) +
+      kv("Abandono " + (ab.anio ? ab.anio.y : ""), nf(bA, 1) + "% <span class='pill'>" + b.anio.ab + "/" + b.anio.n + "</span>", sem(bA, O.abandono, 4, true)) +
+      kv("Satisfacción coach", nf(s.coach && s.coach.media, 2) + " <span class='pill'>" + (s.coach ? s.coach.n : 0) + "</span>", sem(s.coach && s.coach.media, O.satisfaccion, 1)) +
+      kv("Satisfacción resultados", nf(s.resultados && s.resultados.media, 2), sem(s.resultados && s.resultados.media, O.satisfaccion, 1)) +
+      kv("Cumplimiento 30 días", nf(c.cumplimiento, 1) + "%", sem(c.cumplimiento, O.cumplimiento, 10)) +
+      kv("Pérdida media", nf(c.kg, 1) + " kg · " + nf(c.cm, 1) + " cm cintura") + '</div>';
+  }).join("") + '</div>';
+  // 4) Por fase
+  const FAS = ["Fase 1", "Fase 2", "Fase 3", "Fase 4", "Recurrencia"];
+  const cell = (o) => o && o.n ? '<b class="' + sem(o.v, O.cumplimiento, 10) + '">' + nf(o.v, 0) + '%</b> <span class="pill">' + o.n + '</span>' : '<span style="color:var(--muted)">—</span>';
+  let t1 = '<table class="tbl"><tr><th>Fase</th><th class="n">Activas</th><th class="n">Cumplimiento</th>' + COA.map(k => '<th class="n">' + k + '</th>').join("") + '<th class="n">Kg</th><th class="n">Cm cintura</th></tr>';
+  FAS.forEach(f => { const r = (cu.porFase || {})[f] || {}, m = (cu.matriz || {})[f] || {};
+    t1 += '<tr><td>' + f + '</td><td class="n">' + ((ac.porFase || {})[f] || 0) + '</td><td class="n"><b class="' + sem(r.cumplimiento, O.cumplimiento, 10) + '">' + nf(r.cumplimiento, 1) + '%</b></td>' + COA.map(k => '<td class="n">' + cell(m[k]) + '</td>').join("") +
+      '<td class="n">' + (r.kg != null ? "−" + nf(r.kg, 1) : "—") + '</td><td class="n">' + (r.cm != null ? "−" + nf(r.cm, 1) : "—") + '</td></tr>'; });
+  t1 += '</table>';
+  const CVM = { 1: "mes 3", 2: "mes 5", 3: "mes 8", 4: "mes 11" };
+  let t2 = '<table class="tbl"><tr><th>Client Vision</th><th class="n">Respuestas</th><th class="n">Resultados</th><th class="n">Programa</th><th class="n">Coach</th></tr>';
+  [1, 2, 3, 4].forEach(f => { const r = (sa.porFase || {})[f] || {}; const v = o => '<b class="' + sem(o && o.media, O.satisfaccion, 1) + '">' + nf(o && o.media, 2) + '</b>';
+    t2 += '<tr><td>Fase ' + f + ' <span class="pill">' + CVM[f] + '</span></td><td class="n">' + (r.respuestas || 0) + '</td><td class="n">' + v(r.resultados) + '</td><td class="n">' + v(r.programa) + '</td><td class="n">' + v(r.coach) + '</td></tr>'; });
+  t2 += '</table>';
+  h += sec("Por fase · cumplimiento y cuerpo (TrainerStudio, clientas activas)") + '<div class="box">' + t1 + '</div>';
+  h += sec("Por fase · satisfacción (Client Vision)") + '<div class="box">' + t2 + '</div>';
+  // 5) Riesgo
+  const rg = d.riesgo || [], dz = d.desaparecidas || [];
+  let t3 = rg.length ? '<table class="tbl"><tr><th>Clienta</th><th>Coach</th><th>Fase</th><th class="n">30 días</th><th class="n">7 días</th></tr>' +
+    rg.map(r => '<tr><td>' + esc(r.nombre) + '</td><td>' + esc(r.coach) + '</td><td>' + esc(r.fase) + '</td><td class="n"><b class="' + (r.c30 < 30 ? "red" : "amber") + '">' + nf(r.c30) + '%</b></td><td class="n">' + (r.c7 == null ? "—" : nf(r.c7) + "%") + '</td></tr>').join("") + '</table>'
+    : '<div class="foot" style="padding:6px">Ninguna clienta activa por debajo del ' + O.riesgo + '% 🎉</div>';
+  if (dz.length) t3 += '<div class="foot" style="padding:8px 8px 4px"><b style="color:var(--red)">Desaparecidas (abandono, aún en ALTA):</b> ' + dz.map(z => esc(z.nombre) + " (" + esc(z.coach) + ", " + esc(z.fase) + ")").join(" · ") + '</div>';
+  h += sec("Clientas en riesgo · cumplimiento &lt; " + O.riesgo + "% en 30 días (" + rg.length + ")") + '<div class="box">' + t3 + '</div>';
+  // 6) Renovaciones
+  if (rn.meses && rn.meses.length) {
+    let lista = rm && rm.lista && rm.lista.length ? '<table class="tbl"><tr><th>Clienta</th><th>Coach</th><th class="n">Renovación nº</th><th class="n">¿Renueva?</th></tr>' +
+      rm.lista.map(r => '<tr><td>' + esc(r.nombre) + '</td><td>' + esc(r.coach) + '</td><td class="n">' + r.n + '</td><td class="n">' + (r.renueva ? '<b class="green">Sí</b>' : '<b class="red">No</b>') + '</td></tr>').join("") + '</table>' : "";
+    h += sec("Renovaciones " + (rn.anio ? rn.anio.y : "")) + '<div class="two"><div class="chart"><div class="legend"><span>% que renueva cada mes · línea = objetivo ' + O.renovacion + '%</span></div>' + barsRenov(rn.meses, O.renovacion) + '</div>' +
+      (lista ? '<div class="box"><div class="legend" style="padding:4px 8px 0">' + esc(rm.nombre.toLowerCase()) + '</div>' + lista + '</div>' : "") + '</div>';
+  }
+  // 7) Extras
+  const no = sa.notas || {}, re = sa.respondidos || {};
+  h += sec("Otros indicadores") + '<div class="grid">' +
+    bigCard("Notas 9–10", "Client Vision · todas las preguntas", nf(pc(no.altas, no.n), 1), "%", sem(pc(no.altas, no.n), 80, 10), (no.altas || 0) + " de " + (no.n || 0) + " notas") +
+    bigCard("Notas ≤ 6", "Client Vision · todas las preguntas", nf(pc(no.bajas, no.n), 1), "%", sem(pc(no.bajas, no.n), 5, 5, true), (no.bajas || 0) + " de " + (no.n || 0) + " notas") +
+    bigCard("Client Vision respondidos", "Clientas activas que ya debían responder", nf(pc(re.hechos, re.esperados), 1), "%", sem(pc(re.hechos, re.esperados), 90, 15), (re.hechos || 0) + " de " + (re.esperados || 0) + " formularios (fases 1–3)") +
+    bigCard("Kg perdidos", "Media clientas activas", cu.kg != null ? nf(cu.kg, 1) : null, " kg", "neutral", "Desde su primera medición en TrainerStudio") +
+    bigCard("Cintura", "Media clientas activas", cu.cm != null ? nf(cu.cm, 1) : null, " cm", "neutral", "Desde su primera medición en TrainerStudio") +
+    bigCard("Clientas activas", "Estado ALTA en el CRM", ac.total, "", "neutral", COA.map(k => k + " " + ((ac.porCoach || {})[k] || 0)).join(" · ")) +
+    '</div>';
+  h += '<div class="note" style="margin-top:-6px">Notion y Client Vision se leen en directo (caché de 3 h). TrainerStudio se copia cada mañana: datos del ' + fdate(d.tsActualizado) + '. El LTV solo cuenta clientas desde dic-2022 (antes no había datos completos en Notion).</div>';
+  document.getElementById("ceo").innerHTML = h;
+  const t = new Date(d.updatedAt);
+  document.getElementById("stamp").textContent = "Actualizado " + t.toLocaleString("es-ES", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit", timeZone: "Europe/Madrid" });
+  const err = document.getElementById("err");
+  if (d.avisos && d.avisos.length) { err.textContent = d.avisos.join(" · "); err.hidden = false; }
+}
+
 const API = "https://script.google.com/macros/s/AKfycbxWSdheRFPwOYmyp8M4936GVyqja6qCNxXYe6JKiPp2t9iHZnGIHvNUJgFL9s3IZ5RHXg/exec?format=json";
 let VISTA = new URLSearchParams(location.search).get("vista") || "";
-function onData(data) { const err = document.getElementById("err"); err.hidden = true; render(data); const avisos = []; if (data.pagosError) avisos.push("Pago único no disponible (" + data.pagosError + ")"); if (data.setterError && VISTA === "setter") avisos.push("Métricas de setter no disponibles (" + data.setterError + ")"); if (data.objetivoSemanaError) avisos.push("Objetivo semanal no disponible (" + data.objetivoSemanaError + ")"); if (data.objetivoError) avisos.push("Objetivos no disponibles (" + data.objetivoError + ")"); if (avisos.length) { err.textContent = avisos.join(" · "); err.hidden = false; } }
+function onData(data) { const err = document.getElementById("err"); err.hidden = true; if (VISTA === "servicio") { renderServicio(data); return; } render(data); const avisos = []; if (data.pagosError) avisos.push("Pago único no disponible (" + data.pagosError + ")"); if (data.setterError && VISTA === "setter") avisos.push("Métricas de setter no disponibles (" + data.setterError + ")"); if (data.objetivoSemanaError) avisos.push("Objetivo semanal no disponible (" + data.objetivoSemanaError + ")"); if (data.objetivoError) avisos.push("Objetivos no disponibles (" + data.objetivoError + ")"); if (avisos.length) { err.textContent = avisos.join(" · "); err.hidden = false; } }
 function load() {
   const err = document.getElementById("err");
-  fetch(API + (VISTA === "ceo" ? "&vista=ceo" : "") + "&t=" + Date.now(), { credentials: "omit", cache: "no-store" })
+  fetch(API + (VISTA === "ceo" ? "&vista=ceo" : VISTA === "servicio" ? "&vista=servicio&k=" + encodeURIComponent(new URLSearchParams(location.search).get("k") || "") : "") + "&t=" + Date.now(), { credentials: "omit", cache: "no-store" })
     .then(r => r.json())
     .then(data => { if (data.error) throw new Error(data.error); onData(data); })
     .catch(e => { err.textContent = "No se pudieron cargar las métricas (" + (e && e.message || e) + "). Reintentando…"; err.hidden = false; });
